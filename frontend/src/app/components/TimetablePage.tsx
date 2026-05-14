@@ -27,7 +27,7 @@ interface ApiTimetableResponse {
 	}>
 }
 
-const TIMETABLE_API_BASE = 'http://46.101.98.64:8001'
+const TIMETABLE_API_BASE = '/api/tt'
 const SAMPLE_GROUP = 'ICE-23-04'
 
 const COLORS = [

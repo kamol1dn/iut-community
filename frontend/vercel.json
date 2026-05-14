@@ -1,0 +1,12 @@
+{
+	"rewrites": [
+		{
+			"source": "/api/auth/:path*",
+			"destination": "http://46.101.98.64:8088/:path*"
+		},
+		{
+			"source": "/api/tt/:path*",
+			"destination": "http://46.101.98.64:8001/:path*"
+		}
+	]
+}

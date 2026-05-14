@@ -27,16 +27,16 @@ export default defineConfig({
 
 	server: {
 		proxy: {
-			'/timetable': { target: 'http://46.101.98.64:8001', changeOrigin: true },
-			'/bookings': { target: 'http://46.101.98.64:8001', changeOrigin: true },
-			'/notifications': {
+			'/api/auth': {
+				target: 'http://46.101.98.64:8088',
+				changeOrigin: true,
+				rewrite: path => path.replace(/^\/api\/auth/, ''),
+			},
+			'/api/tt': {
 				target: 'http://46.101.98.64:8001',
 				changeOrigin: true,
+				rewrite: path => path.replace(/^\/api\/tt/, ''),
 			},
-			'/login': { target: 'http://46.101.98.64:8088', changeOrigin: true },
-			'/register': { target: 'http://46.101.98.64:8088', changeOrigin: true },
-			'/me': { target: 'http://46.101.98.64:8088', changeOrigin: true },
-			'/clubs': { target: 'http://46.101.98.64:8088', changeOrigin: true },
 		},
 	},
 })

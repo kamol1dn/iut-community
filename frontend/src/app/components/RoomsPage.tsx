@@ -20,7 +20,7 @@ type RoomEntry = {
 }
 type Booking = Record<string, unknown>
 
-const TIMETABLE_API_BASE = 'http://46.101.98.64:8001'
+const TIMETABLE_API_BASE = '/api/tt'
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'] as const
 type Day = (typeof DAYS)[number]
 

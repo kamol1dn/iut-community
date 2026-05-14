@@ -2,7 +2,7 @@ import { ArrowRight, Bell, BookOpen, Calendar, Users } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { authFetch } from '../lib/api'
 
-const CLUBS_API_BASE = 'http://46.101.98.64:8088'
+const CLUBS_API_BASE = '/api/auth'
 
 type CourseOut = { id: string; code: string; name: string }
 type AssignmentOut = {

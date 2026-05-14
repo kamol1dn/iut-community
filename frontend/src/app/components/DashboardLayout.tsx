@@ -12,7 +12,7 @@ import { useEffect, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
 import { authFetch } from '../lib/api'
 
-const CLUBS_API_BASE = 'http://46.101.98.64:8088'
+const CLUBS_API_BASE = '/api/auth'
 
 export function DashboardLayout() {
 	const navigate = useNavigate()
