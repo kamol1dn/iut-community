@@ -59,6 +59,33 @@ function str(v: unknown): string {
 	return JSON.stringify(v)
 }
 
+// Periods start at 9:30 AM and each period is 30 minutes long.
+// A class runs 3 periods (90 minutes) by default.
+const PERIOD_START_MIN = 9 * 60 + 30
+const PERIOD_LENGTH_MIN = 30
+const CLASS_PERIODS = 3
+
+function fmtTime(totalMin: number): string {
+	const h = Math.floor(totalMin / 60)
+	const m = totalMin % 60
+	const ampm = h >= 12 ? 'PM' : 'AM'
+	const h12 = h % 12 === 0 ? 12 : h % 12
+	return `${h12}:${String(m).padStart(2, '0')} ${ampm}`
+}
+
+// Time range for a single 30-minute period slot.
+function periodSlot(p: number): string {
+	const start = PERIOD_START_MIN + (p - 1) * PERIOD_LENGTH_MIN
+	return `${fmtTime(start)} – ${fmtTime(start + PERIOD_LENGTH_MIN)}`
+}
+
+// Time range for a full class starting at period p (3 periods / 90 minutes).
+function classTime(p: number, periods = CLASS_PERIODS): string | null {
+	if (!Number.isFinite(p)) return null
+	const start = PERIOD_START_MIN + (p - 1) * PERIOD_LENGTH_MIN
+	return `${fmtTime(start)} – ${fmtTime(start + periods * PERIOD_LENGTH_MIN)}`
+}
+
 export function TimetablePage() {
 	const [sessions, setSessions] = useState<Session[]>([])
 	const [loading, setLoading] = useState(true)
@@ -184,67 +211,94 @@ export function TimetablePage() {
 				</div>
 			)}
 
-			{viewMode === 'weekly' && sessions.length > 0 && (
-				<div className='bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm'>
-					<div className='overflow-x-auto'>
-						<div className='min-w-[700px]'>
-							<div className='grid grid-cols-6 bg-gray-50 border-b border-gray-200'>
-								<div className='p-4 border-r border-gray-200'>
-									<p className='text-gray-600'>Period</p>
-								</div>
-								{DAYS.map(day => (
-									<div
-										key={day}
-										className='p-4 border-r border-gray-200 last:border-r-0'
-									>
-										<p className='text-gray-900'>{day}</p>
-										{day === TODAY && (
-											<span className='inline-block px-2 py-0.5 bg-blue-100 text-blue-700 rounded mt-1'>
-												Today
-											</span>
-										)}
+			{viewMode === 'weekly' &&
+				sessions.length > 0 &&
+				(() => {
+					// Sorted list of period numbers that actually appear in the data
+					const periods = [
+						...new Set(
+							sessions
+								.map(s => Number(s.period))
+								.filter(n => Number.isFinite(n)),
+						),
+					].sort((a, b) => a - b)
+
+					// Index sessions by day + period so each lands in the right cell
+					const cell: Record<string, Session[]> = {}
+					for (const s of sessions) {
+						const key = `${str(s.day)}|${Number(s.period)}`
+						;(cell[key] ??= []).push(s)
+					}
+
+					return (
+						<div className='bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm'>
+							<div className='overflow-x-auto'>
+								<div className='min-w-[700px]'>
+									<div className='grid grid-cols-6 bg-gray-50 border-b border-gray-200'>
+										<div className='p-4 border-r border-gray-200'>
+											<p className='text-gray-600'>Period</p>
+										</div>
+										{DAYS.map(day => (
+											<div
+												key={day}
+												className='p-4 border-r border-gray-200 last:border-r-0'
+											>
+												<p className='text-gray-900'>{day}</p>
+												{day === TODAY && (
+													<span className='inline-block px-2 py-0.5 bg-blue-100 text-blue-700 rounded mt-1'>
+														Today
+													</span>
+												)}
+											</div>
+										))}
 									</div>
-								))}
-							</div>
-							<div className='grid grid-cols-6'>
-								<div className='border-r border-gray-200 bg-gray-50'>
-									{Array.from({ length: 10 }, (_, i) => i + 1).map(p => (
-										<div key={p} className='p-4 border-b border-gray-200 h-20'>
-											<p className='text-gray-500'>Period {p}</p>
+									{periods.map(p => (
+										<div
+											key={p}
+											className='grid grid-cols-6 border-b border-gray-200 last:border-b-0'
+										>
+											<div className='p-4 border-r border-gray-200 bg-gray-50'>
+												<p className='text-gray-500'>Period {p}</p>
+												<p className='text-gray-400 text-sm mt-0.5'>
+													{periodSlot(p)}
+												</p>
+											</div>
+											{DAYS.map(day => (
+												<div
+													key={day}
+													className='p-2 border-r border-gray-200 last:border-r-0 space-y-2'
+												>
+													{(cell[`${day}|${p}`] ?? []).map((s, i) => (
+														<button
+															key={i}
+															onClick={() => setSelected(s)}
+															className={`w-full p-3 rounded-lg border text-left hover:shadow-md transition ${colorFor(str(s.subject))}`}
+														>
+															<p className='font-medium truncate'>
+																{str(s.subject)}
+															</p>
+															{classTime(Number(s.period)) && (
+																<p className='mt-0.5 opacity-75 flex items-center gap-1'>
+																	<Clock className='w-3 h-3' />
+																	{classTime(Number(s.period))}
+																</p>
+															)}
+															{s.room != null && (
+																<p className='mt-0.5 opacity-75'>
+																	{str(s.room)}
+																</p>
+															)}
+														</button>
+													))}
+												</div>
+											))}
 										</div>
 									))}
 								</div>
-								{DAYS.map(day => (
-									<div
-										key={day}
-										className='border-r border-gray-200 last:border-r-0'
-									>
-										<div className='p-2 min-h-[480px]'>
-											{(byDay[day] ?? []).map((s, i) => (
-												<button
-													key={i}
-													onClick={() => setSelected(s)}
-													className={`w-full p-3 mb-2 rounded-lg border text-left hover:shadow-md transition ${colorFor(str(s.subject))}`}
-												>
-													<p className='font-medium truncate'>
-														{str(s.subject)}
-													</p>
-													<p className='mt-1 opacity-90'>
-														Period {str(s.period)}
-													</p>
-													{s.room != null && (
-														<p className='mt-0.5 opacity-75'>{str(s.room)}</p>
-													)}
-												</button>
-											))}
-										</div>
-									</div>
-								))}
 							</div>
 						</div>
-					</div>
-				</div>
-			)}
+					)
+				})()}
 
 			{viewMode === 'daily' && (
 				<div className='space-y-3'>
@@ -268,6 +322,12 @@ export function TimetablePage() {
 									</span>
 								</div>
 								<div className='flex gap-4 mt-3'>
+									{classTime(Number(s.period)) && (
+										<div className='flex items-center gap-1.5'>
+											<Clock className='w-4 h-4' />
+											<span>{classTime(Number(s.period))}</span>
+										</div>
+									)}
 									{s.room != null && (
 										<div className='flex items-center gap-1.5'>
 											<MapPin className='w-4 h-4' />
