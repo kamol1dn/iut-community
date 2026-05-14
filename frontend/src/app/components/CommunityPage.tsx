@@ -1,268 +1,321 @@
-import { Calendar, MessageSquare, Search, Send, Users } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { MessageSquare, Search, Send, Users } from 'lucide-react'
+import { authFetch } from '../lib/api'
 
-type Club = {
+type ClubOut = {
 	id: string
 	name: string
-	meeting: string
-	members: number
-	category: string
+	description: string
+	image_url?: string | null
 }
 
-type Post = {
+type PostOut = {
 	id: string
-	author: string
-	groupId: string
-	title: string
-	content: string
-	timeAgo: string
-	replies: number
+	club_id: string
+	author_id: string
+	author_name: string
+	body: string
+	created_at: string
+}
+
+function timeAgo(iso: string) {
+	const diff = Date.now() - new Date(iso).getTime()
+	const mins = Math.floor(diff / 60000)
+	if (mins < 60) return `${mins}m ago`
+	const hrs = Math.floor(mins / 60)
+	if (hrs < 24) return `${hrs}h ago`
+	return `${Math.floor(hrs / 24)}d ago`
 }
 
 export function CommunityPage() {
 	const [activeTab, setActiveTab] = useState<'clubs' | 'board'>('clubs')
 	const [searchQuery, setSearchQuery] = useState('')
 
-	const clubs: Club[] = [
-		{
-			id: '1',
-			name: 'Coding Club',
-			meeting: 'Fridays, 4:00 PM',
-			members: 45,
-			category: 'Technology',
-		},
-		{
-			id: '2',
-			name: 'Robotics Society',
-			meeting: 'Wednesdays, 3:30 PM',
-			members: 32,
-			category: 'Engineering',
-		},
-		{
-			id: '3',
-			name: 'Photography Club',
-			meeting: 'Tuesdays, 5:00 PM',
-			members: 28,
-			category: 'Arts',
-		},
-		{
-			id: '4',
-			name: 'Debate Society',
-			meeting: 'Thursdays, 6:00 PM',
-			members: 38,
-			category: 'Arts',
-		},
-		{
-			id: '5',
-			name: 'Data Science Club',
-			meeting: 'Mondays, 4:30 PM',
-			members: 51,
-			category: 'Technology',
-		},
-		{
-			id: '6',
-			name: 'Sports Committee',
-			meeting: 'Saturdays, 10:00 AM',
-			members: 67,
-			category: 'Sports',
-		},
-	]
+	// Clubs
+	const [clubs, setClubs] = useState<ClubOut[]>([])
+	const [joinedIds, setJoinedIds] = useState<Set<string>>(new Set())
+	const [clubsLoading, setClubsLoading] = useState(true)
+	const [clubsError, setClubsError] = useState<string | null>(null)
 
-	const posts: Post[] = [
-		{
-			id: '1',
-			author: 'Sarah Kim',
-			groupId: 'ICE-23-05',
-			title: 'Looking for 2 members for DAD project',
-			content:
-				'We need 2 more people for our Database project. Topic is E-commerce System. Contact me if interested!',
-			timeAgo: '2 hours ago',
-			replies: 5,
-		},
-		{
-			id: '2',
-			author: 'Mike Johnson',
-			groupId: 'ICE-23-08',
-			title: 'Found lost keys in A608',
-			content:
-				'Found a set of keys with a red keychain in room A608 after Professional Skills class. Check with me to claim.',
-			timeAgo: '5 hours ago',
-			replies: 2,
-		},
-		{
-			id: '3',
-			author: 'Emma Chen',
-			groupId: 'ICE-23-02',
-			title: 'Study group for Computer Networks midterm',
-			content:
-				'Starting a study group for CN midterm. Meeting this Saturday at 2 PM in library. DM if you want to join!',
-			timeAgo: '1 day ago',
-			replies: 12,
-		},
-		{
-			id: '4',
-			author: 'Alex Rivera',
-			groupId: 'ICE-23-11',
-			title: 'Selling used textbooks',
-			content:
-				'Selling Database and Networks textbooks in good condition. Half the original price. Contact for details.',
-			timeAgo: '1 day ago',
-			replies: 3,
-		},
-	]
+	// Board
+	const [selectedClub, setSelectedClub] = useState<ClubOut | null>(null)
+	const [posts, setPosts] = useState<PostOut[]>([])
+	const [postsLoading, setPostsLoading] = useState(false)
+	const [newPostBody, setNewPostBody] = useState('')
+	const [postSubmitting, setPostSubmitting] = useState(false)
+	const [postError, setPostError] = useState<string | null>(null)
 
-	const filteredClubs = clubs.filter(club =>
-		club.name.toLowerCase().includes(searchQuery.toLowerCase()),
-	)
+	useEffect(() => {
+		authFetch('/clubs')
+			.then(r => (r.ok ? r.json() : []))
+			.then(d => setClubs(Array.isArray(d) ? d : []))
+			.catch(e => setClubsError(e.message))
+			.finally(() => setClubsLoading(false))
+	}, [])
 
-	const filteredPosts = posts.filter(
-		post =>
-			post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			post.content.toLowerCase().includes(searchQuery.toLowerCase()),
+	useEffect(() => {
+		if (!selectedClub) return
+		setPostsLoading(true)
+		setPostError(null)
+		authFetch(`/clubs/${selectedClub.id}/posts`)
+			.then(r => (r.ok ? r.json() : []))
+			.then(d => setPosts(Array.isArray(d) ? d : []))
+			.catch(e => setPostError(e.message))
+			.finally(() => setPostsLoading(false))
+	}, [selectedClub])
+
+	const handleJoin = async (club: ClubOut) => {
+		const res = await authFetch(`/clubs/${club.id}/join`, { method: 'POST' })
+		if (res.ok || res.status === 201)
+			setJoinedIds(prev => new Set([...prev, club.id]))
+	}
+
+	const handleLeave = async (club: ClubOut) => {
+		const res = await authFetch(`/clubs/${club.id}/leave`, { method: 'DELETE' })
+		if (res.ok || res.status === 204)
+			setJoinedIds(prev => {
+				const s = new Set(prev)
+				s.delete(club.id)
+				return s
+			})
+	}
+
+	const handlePost = async () => {
+		if (!selectedClub || !newPostBody.trim()) return
+		setPostSubmitting(true)
+		setPostError(null)
+		try {
+			const res = await authFetch(`/clubs/${selectedClub.id}/posts`, {
+				method: 'POST',
+				body: JSON.stringify({ body: newPostBody }),
+			})
+			if (!res.ok) {
+				const data = await res.json().catch(() => null)
+				throw new Error(data?.detail ?? `Post failed (${res.status})`)
+			}
+			const post: PostOut = await res.json()
+			setPosts(prev => [post, ...prev])
+			setNewPostBody('')
+		} catch (e) {
+			setPostError(e instanceof Error ? e.message : 'Failed to post')
+		} finally {
+			setPostSubmitting(false)
+		}
+	}
+
+	const filteredClubs = clubs.filter(
+		c =>
+			c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+			c.description.toLowerCase().includes(searchQuery.toLowerCase()),
 	)
 
 	return (
 		<div className='space-y-6'>
 			<div>
 				<h1 className='text-gray-900'>Community & Clubs</h1>
-				<p className='text-muted-foreground mt-1'>
-					Connect with fellow students
-				</p>
+				<p className='text-muted-foreground mt-1'>Connect with fellow students</p>
 			</div>
 
 			{/* Tabs */}
 			<div className='flex gap-2 border-b border-gray-200'>
-				<button
-					onClick={() => setActiveTab('clubs')}
-					className={`px-4 py-3 border-b-2 transition ${
-						activeTab === 'clubs'
-							? 'border-blue-600 text-blue-600'
-							: 'border-transparent text-gray-600 hover:text-gray-900'
-					}`}
-				>
-					Clubs Directory
-				</button>
-				<button
-					onClick={() => setActiveTab('board')}
-					className={`px-4 py-3 border-b-2 transition ${
-						activeTab === 'board'
-							? 'border-blue-600 text-blue-600'
-							: 'border-transparent text-gray-600 hover:text-gray-900'
-					}`}
-				>
-					Notice Board
-				</button>
-			</div>
-
-			{/* Search */}
-			<div className='relative'>
-				<Search className='absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400' />
-				<input
-					type='text'
-					placeholder={
-						activeTab === 'clubs' ? 'Search clubs...' : 'Search posts...'
-					}
-					value={searchQuery}
-					onChange={e => setSearchQuery(e.target.value)}
-					className='w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition bg-white'
-				/>
-			</div>
-
-			{/* Content */}
-			{activeTab === 'clubs' ? (
-				<div className='grid md:grid-cols-2 lg:grid-cols-3 gap-4'>
-					{filteredClubs.map(club => (
-						<div
-							key={club.id}
-							className='bg-white rounded-xl border border-gray-200 p-5 shadow-sm hover:shadow-md transition'
-						>
-							<div className='flex items-start gap-3 mb-3'>
-								<div className='p-2 bg-blue-100 rounded-lg'>
-									<Users className='w-5 h-5 text-blue-600' />
-								</div>
-								<div className='flex-1 min-w-0'>
-									<h3 className='text-gray-900'>{club.name}</h3>
-									<p className='text-gray-500'>{club.category}</p>
-								</div>
-							</div>
-
-							<div className='space-y-2'>
-								<div className='flex items-center gap-2 text-gray-600'>
-									<Calendar className='w-4 h-4' />
-									<span>{club.meeting}</span>
-								</div>
-								<div className='flex items-center gap-2 text-gray-600'>
-									<Users className='w-4 h-4' />
-									<span>{club.members} members</span>
-								</div>
-							</div>
-
-							<button className='w-full mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition'>
-								Join Club
-							</button>
-						</div>
-					))}
-				</div>
-			) : (
-				<div className='space-y-4'>
-					{/* New Post Button */}
-					<button className='w-full bg-white border border-gray-300 rounded-lg p-4 text-left text-gray-500 hover:bg-gray-50 hover:border-gray-400 transition flex items-center gap-2'>
-						<Send className='w-5 h-5' />
-						<span>Create a new post...</span>
+				{(
+					[
+						['clubs', 'Clubs Directory'],
+						['board', 'Notice Board'],
+					] as const
+				).map(([tab, label]) => (
+					<button
+						key={tab}
+						onClick={() => setActiveTab(tab)}
+						className={`px-4 py-3 border-b-2 transition ${
+							activeTab === tab
+								? 'border-blue-600 text-blue-600'
+								: 'border-transparent text-gray-600 hover:text-gray-900'
+						}`}
+					>
+						{label}
 					</button>
+				))}
+			</div>
 
-					{/* Posts */}
-					{filteredPosts.map(post => (
-						<div
-							key={post.id}
-							className='bg-white rounded-xl border border-gray-200 p-5 shadow-sm hover:shadow-md transition cursor-pointer'
-						>
-							<div className='flex items-start gap-3 mb-3'>
-								<div className='w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white flex-shrink-0'>
-									{post.author.charAt(0)}
-								</div>
-								<div className='flex-1 min-w-0'>
-									<div className='flex items-center gap-2 flex-wrap'>
-										<p className='text-gray-900'>{post.author}</p>
-										<span className='text-gray-400'>•</span>
-										<span className='text-gray-500'>{post.groupId}</span>
-										<span className='text-gray-400'>•</span>
-										<span className='text-gray-500'>{post.timeAgo}</span>
-									</div>
-									<h3 className='text-gray-900 mt-1'>{post.title}</h3>
-								</div>
-							</div>
+			{/* Clubs tab */}
+			{activeTab === 'clubs' && (
+				<>
+					<div className='relative'>
+						<Search className='absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400' />
+						<input
+							type='text'
+							placeholder='Search clubs…'
+							value={searchQuery}
+							onChange={e => setSearchQuery(e.target.value)}
+							className='w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition bg-white'
+						/>
+					</div>
 
-							<p className='text-gray-600 mb-3'>{post.content}</p>
-
-							<div className='flex items-center gap-2 text-gray-500'>
-								<MessageSquare className='w-4 h-4' />
-								<span>{post.replies} replies</span>
-							</div>
+					{clubsLoading && (
+						<div className='text-center py-8 text-gray-500'>
+							Loading clubs…
 						</div>
-					))}
-				</div>
+					)}
+					{clubsError && (
+						<div className='p-4 text-red-600 bg-red-50 rounded-xl border border-red-200'>
+							{clubsError}
+						</div>
+					)}
+
+					<div className='grid md:grid-cols-2 lg:grid-cols-3 gap-4'>
+						{filteredClubs.map(club => {
+							const joined = joinedIds.has(club.id)
+							return (
+								<div
+									key={club.id}
+									className='bg-white rounded-xl border border-gray-200 p-5 shadow-sm hover:shadow-md transition'
+								>
+									{club.image_url ? (
+										<img
+											src={club.image_url}
+											alt={club.name}
+											className='w-12 h-12 rounded-lg object-cover mb-3'
+										/>
+									) : (
+										<div className='p-2 bg-blue-100 rounded-lg w-fit mb-3'>
+											<Users className='w-5 h-5 text-blue-600' />
+										</div>
+									)}
+									<h3 className='text-gray-900'>{club.name}</h3>
+									<p className='text-gray-500 mt-1 line-clamp-2'>
+										{club.description}
+									</p>
+									<div className='flex gap-2 mt-4'>
+										<button
+											onClick={() =>
+												joined ? handleLeave(club) : handleJoin(club)
+											}
+											className={`flex-1 px-4 py-2 rounded-lg transition ${
+												joined
+													? 'bg-gray-100 text-gray-700 hover:bg-red-50 hover:text-red-600'
+													: 'bg-blue-600 text-white hover:bg-blue-700'
+											}`}
+										>
+											{joined ? 'Leave' : 'Join'}
+										</button>
+										<button
+											onClick={() => {
+												setSelectedClub(club)
+												setActiveTab('board')
+											}}
+											className='px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition'
+										>
+											Posts
+										</button>
+									</div>
+								</div>
+							)
+						})}
+
+						{filteredClubs.length === 0 && !clubsLoading && (
+							<div className='col-span-3 text-center py-12 bg-white rounded-xl border border-gray-200'>
+								<Users className='w-12 h-12 mx-auto mb-3 text-gray-300' />
+								<p className='text-gray-900'>No clubs found</p>
+							</div>
+						)}
+					</div>
+				</>
 			)}
 
-			{/* Empty States */}
-			{activeTab === 'clubs' && filteredClubs.length === 0 && (
-				<div className='text-center py-12 bg-white rounded-xl border border-gray-200'>
-					<Users className='w-12 h-12 mx-auto mb-3 text-gray-300' />
-					<p className='text-gray-900'>No clubs found</p>
-					<p className='text-muted-foreground mt-1'>
-						Try a different search term
-					</p>
-				</div>
-			)}
+			{/* Board tab */}
+			{activeTab === 'board' && (
+				<>
+					<select
+						value={selectedClub?.id ?? ''}
+						onChange={e => {
+							setSelectedClub(clubs.find(c => c.id === e.target.value) ?? null)
+						}}
+						className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-blue-500 outline-none bg-white'
+					>
+						<option value=''>Select a club…</option>
+						{clubs.map(c => (
+							<option key={c.id} value={c.id}>
+								{c.name}
+							</option>
+						))}
+					</select>
 
-			{activeTab === 'board' && filteredPosts.length === 0 && (
-				<div className='text-center py-12 bg-white rounded-xl border border-gray-200'>
-					<MessageSquare className='w-12 h-12 mx-auto mb-3 text-gray-300' />
-					<p className='text-gray-900'>No posts found</p>
-					<p className='text-muted-foreground mt-1'>
-						Try a different search term
-					</p>
-				</div>
+					{selectedClub ? (
+						<>
+							{/* New post */}
+							<div className='bg-white rounded-xl border border-gray-200 p-4 shadow-sm space-y-3'>
+								<textarea
+									placeholder={`Write a post in ${selectedClub.name}…`}
+									value={newPostBody}
+									onChange={e => setNewPostBody(e.target.value)}
+									maxLength={2000}
+									rows={3}
+									className='w-full px-4 py-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none resize-none'
+								/>
+								{postError && (
+									<p className='text-sm text-red-600'>{postError}</p>
+								)}
+								<div className='flex justify-end'>
+									<button
+										onClick={handlePost}
+										disabled={postSubmitting || !newPostBody.trim()}
+										className='flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-60'
+									>
+										<Send className='w-4 h-4' />
+										{postSubmitting ? 'Posting…' : 'Post'}
+									</button>
+								</div>
+							</div>
+
+							{postsLoading && (
+								<div className='text-center py-8 text-gray-500'>
+									Loading posts…
+								</div>
+							)}
+
+							<div className='space-y-4'>
+								{posts.map(post => (
+									<div
+										key={post.id}
+										className='bg-white rounded-xl border border-gray-200 p-5 shadow-sm'
+									>
+										<div className='flex items-start gap-3 mb-3'>
+											<div className='w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white flex-shrink-0'>
+												{post.author_name.charAt(0)}
+											</div>
+											<div>
+												<div className='flex items-center gap-2 flex-wrap'>
+													<p className='text-gray-900'>{post.author_name}</p>
+													<span className='text-gray-400'>•</span>
+													<span className='text-gray-500'>
+														{timeAgo(post.created_at)}
+													</span>
+												</div>
+											</div>
+										</div>
+										<p className='text-gray-600'>{post.body}</p>
+									</div>
+								))}
+
+								{posts.length === 0 && !postsLoading && (
+									<div className='text-center py-12 bg-white rounded-xl border border-gray-200'>
+										<MessageSquare className='w-12 h-12 mx-auto mb-3 text-gray-300' />
+										<p className='text-gray-900'>No posts yet</p>
+										<p className='text-muted-foreground mt-1'>
+											Be the first to post!
+										</p>
+									</div>
+								)}
+							</div>
+						</>
+					) : (
+						<div className='text-center py-12 bg-white rounded-xl border border-gray-200'>
+							<MessageSquare className='w-12 h-12 mx-auto mb-3 text-gray-300' />
+							<p className='text-gray-900'>Select a club to view posts</p>
+						</div>
+					)}
+				</>
 			)}
 		</div>
 	)

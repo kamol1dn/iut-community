@@ -2,7 +2,6 @@ import {
 	Calendar,
 	ChevronDown,
 	DoorOpen,
-	GraduationCap,
 	Home,
 	LogOut,
 	Menu,
@@ -10,14 +9,30 @@ import {
 	Users,
 	X,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
+import { authFetch } from '../lib/api'
 
 export function DashboardLayout() {
 	const navigate = useNavigate()
 	const location = useLocation()
 	const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 	const [communityExpanded, setCommunityExpanded] = useState(false)
+	const [fullName, setFullName] = useState(localStorage.getItem('full_name') ?? '')
+	const [group, setGroup] = useState(localStorage.getItem('group') ?? '')
+
+	useEffect(() => {
+		authFetch('/dashboard')
+			.then(r => (r.ok ? r.json() : null))
+			.then(d => {
+				if (!d) return
+				setFullName(d.full_name)
+				setGroup(d.group)
+				localStorage.setItem('full_name', d.full_name)
+				localStorage.setItem('group', d.group)
+			})
+			.catch(() => {})
+	}, [])
 
 	const navItems = [
 		{ path: '/dashboard', label: 'Overview', icon: Home },
@@ -26,6 +41,7 @@ export function DashboardLayout() {
 	]
 
 	const handleLogout = () => {
+		localStorage.clear()
 		navigate('/')
 	}
 
@@ -57,11 +73,12 @@ export function DashboardLayout() {
 				<div className='flex flex-col h-full'>
 					{/* Logo */}
 					<div className='p-6 border-b border-gray-200 flex items-center justify-between'>
-						<div className='flex items-center gap-3'>
-							<div className='w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center'>
-								<GraduationCap className='w-6 h-6 text-white' />
-							</div>
-							<span className='text-gray-900'>Portal</span>
+						<div className='flex-1 flex justify-center'>
+							<img
+								src='/assest/logo/logo_dark.png'
+								alt='IUT Core'
+								className='h-16 w-auto object-contain'
+							/>
 						</div>
 						<button
 							onClick={() => setMobileMenuOpen(false)}
@@ -106,7 +123,7 @@ export function DashboardLayout() {
 								}`}
 							>
 								<Users className='w-5 h-5' />
-								<span className='flex-1 text-left'>Community & Clubss</span>
+								<span className='flex-1 text-left'>Community & Clubs</span>
 								<ChevronDown
 									className={`w-4 h-4 transition-transform ${
 										communityExpanded ? 'rotate-180' : ''
@@ -141,8 +158,8 @@ export function DashboardLayout() {
 					{/* User Profile & Actions */}
 					<div className='border-t border-gray-200 p-4 space-y-2'>
 						<div className='px-4 py-3 bg-gray-50 rounded-lg'>
-							<p className='text-gray-900'>John Anderson</p>
-							<p className='text-gray-500 mt-0.5'>ICE-23-03</p>
+							<p className='text-gray-900'>{fullName || '—'}</p>
+							<p className='text-gray-500 mt-0.5'>{group || '—'}</p>
 						</div>
 						<button className='w-full flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition'>
 							<Settings className='w-5 h-5' />
@@ -170,10 +187,11 @@ export function DashboardLayout() {
 						<Menu className='w-6 h-6' />
 					</button>
 					<div className='flex items-center gap-2'>
-						<div className='w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center'>
-							<GraduationCap className='w-5 h-5 text-white' />
-						</div>
-						<span className='text-gray-900'>Portal</span>
+						<img
+							src='/assest/logo/logo_dark.png'
+							alt='IUT Core'
+							className='h-8 w-auto object-contain'
+						/>
 					</div>
 				</div>
 
