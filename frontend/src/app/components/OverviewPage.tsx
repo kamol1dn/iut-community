@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
 import { ArrowRight, Bell, BookOpen, Calendar, Users } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { authFetch } from '../lib/api'
+
+const CLUBS_API_BASE = 'http://46.101.98.64:8088'
 
 type CourseOut = { id: string; code: string; name: string }
 type AssignmentOut = {
@@ -39,7 +41,7 @@ export function OverviewPage() {
 	const [error, setError] = useState<string | null>(null)
 
 	useEffect(() => {
-		authFetch('/dashboard')
+		authFetch(`${CLUBS_API_BASE}/dashboard`)
 			.then(r => {
 				if (!r.ok) throw new Error(`Failed to load dashboard (${r.status})`)
 				return r.json()

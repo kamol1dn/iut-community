@@ -1,8 +1,34 @@
-import { useEffect, useState } from 'react'
 import { Clock, MapPin, User, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { authFetch } from '../lib/api'
 
-type Session = Record<string, unknown>
+type Session = {
+	period: string | number
+	subject: string
+	professors?: string[]
+	professor?: string
+	rooms?: string[]
+	room?: string
+	day?: string
+	days?: string[]
+	groups?: string[]
+}
+
+interface ApiTimetableResponse {
+	group: string
+	total_sessions: number
+	sessions: Array<{
+		period: string | number
+		subject: string
+		professors: string[]
+		groups: string[]
+		rooms: string[]
+		days: string[]
+	}>
+}
+
+const TIMETABLE_API_BASE = 'http://46.101.98.64:8001'
+const SAMPLE_GROUP = 'ICE-23-04'
 
 const COLORS = [
 	'bg-purple-100 text-purple-700 border-purple-200',
@@ -43,13 +69,65 @@ export function TimetablePage() {
 	const TODAY = todayName()
 
 	useEffect(() => {
-		authFetch('/timetable/my/sessions')
+		const url = `${TIMETABLE_API_BASE}/timetable/my/sessions`
+		console.log('Fetching timetable from:', url)
+		authFetch(url)
 			.then(r => {
-				if (!r.ok) throw new Error(`Failed to load timetable (${r.status})`)
+				if (!r.ok) {
+					return r
+						.json()
+						.then(data => {
+							throw new Error(
+								`Failed to load timetable (${r.status}): ${data.detail || 'Unknown error'}`,
+							)
+						})
+						.catch(() => {
+							throw new Error(`Failed to load timetable (${r.status})`)
+						})
+				}
 				return r.json()
 			})
-			.then(d => setSessions(Array.isArray(d) ? d : []))
-			.catch(e => setError(e.message))
+			.then(d => {
+				console.log('Timetable data received:', d)
+				// Transform API response format to component format
+				let sessions: Session[] = []
+				if (d && d.sessions && Array.isArray(d.sessions)) {
+					// Expand each session by day so we have one session per day
+					sessions = d.sessions.flatMap((apiSession: any) => {
+						return (apiSession.days || []).map((day: string) => ({
+							period: apiSession.period,
+							subject: apiSession.subject,
+							day: day,
+							professor: apiSession.professors?.[0] || undefined,
+							professors: apiSession.professors || [],
+							room: apiSession.rooms?.[0] || undefined,
+							rooms: apiSession.rooms || [],
+							groups: apiSession.groups || [],
+						}))
+					})
+				} else if (Array.isArray(d)) {
+					// If response is directly an array of sessions
+					sessions = d.flatMap((apiSession: any) => {
+						return (apiSession.days || []).map((day: string) => ({
+							period: apiSession.period,
+							subject: apiSession.subject,
+							day: day,
+							professor: apiSession.professors?.[0] || undefined,
+							professors: apiSession.professors || [],
+							room: apiSession.rooms?.[0] || undefined,
+							rooms: apiSession.rooms || [],
+							groups: apiSession.groups || [],
+						}))
+					})
+				}
+				console.log('Transformed sessions:', sessions)
+				console.log('Sessions count:', sessions.length)
+				setSessions(sessions)
+			})
+			.catch(e => {
+				console.error('Timetable error:', e)
+				setError(e.message)
+			})
 			.finally(() => setLoading(false))
 	}, [])
 
@@ -131,10 +209,7 @@ export function TimetablePage() {
 							<div className='grid grid-cols-6'>
 								<div className='border-r border-gray-200 bg-gray-50'>
 									{Array.from({ length: 10 }, (_, i) => i + 1).map(p => (
-										<div
-											key={p}
-											className='p-4 border-b border-gray-200 h-20'
-										>
+										<div key={p} className='p-4 border-b border-gray-200 h-20'>
 											<p className='text-gray-500'>Period {p}</p>
 										</div>
 									))}
@@ -199,10 +274,10 @@ export function TimetablePage() {
 											<span>{str(s.room)}</span>
 										</div>
 									)}
-									{s.instructor != null && (
+									{s.professor != null && (
 										<div className='flex items-center gap-1.5'>
 											<User className='w-4 h-4' />
-											<span>{str(s.instructor)}</span>
+											<span>{str(s.professor)}</span>
 										</div>
 									)}
 								</div>

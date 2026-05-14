@@ -1,16 +1,5 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
-import {
-	AlertDialog,
-	AlertDialogAction,
-	AlertDialogCancel,
-	AlertDialogContent,
-	AlertDialogDescription,
-	AlertDialogFooter,
-	AlertDialogHeader,
-	AlertDialogTitle,
-	AlertDialogTrigger,
-} from './ui/alert-dialog'
 
 const INPUT_CLASS =
 	'w-full rounded-lg border border-white/15 bg-white/10 px-4 py-3 text-white placeholder:text-white/60 outline-none transition focus:border-white/30 focus:ring-2 focus:ring-white/10 backdrop-blur-sm'
@@ -59,10 +48,13 @@ export function LoginPage() {
 		setError(null)
 		setLoading(true)
 		try {
-			const res = await fetch('http://46.101.98.64:8000/login', {
+			const res = await fetch('http://46.101.98.64:8088/login', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ student_id: loginStudentId, password: loginPassword }),
+				body: JSON.stringify({
+					student_id: loginStudentId,
+					password: loginPassword,
+				}),
 			})
 			if (!res.ok) {
 				const data = await res.json().catch(() => null)
@@ -84,7 +76,7 @@ export function LoginPage() {
 		setError(null)
 		setLoading(true)
 		try {
-			const res = await fetch('http://46.101.98.64:8000/register', {
+			const res = await fetch('http://46.101.98.64:8088/register', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
@@ -224,47 +216,6 @@ export function LoginPage() {
 								>
 									{loading ? 'Logging in…' : 'Login'}
 								</button>
-
-								<AlertDialog>
-									<AlertDialogTrigger asChild>
-										<button
-											type='button'
-											className='w-full rounded-lg border border-white/30 bg-white py-3 text-center text-blue-700 hover:bg-white/90 whitespace-normal leading-relaxed transition shadow-md'
-										>
-											Contact admin on Telegram for login password
-										</button>
-									</AlertDialogTrigger>
-									<AlertDialogContent>
-										<AlertDialogHeader>
-											<AlertDialogTitle>Security notice</AlertDialogTitle>
-											<AlertDialogDescription>
-												To keep everyone safe, please go to Telegram and request
-												your login password manually from the admin account using
-												the link below.
-											</AlertDialogDescription>
-										</AlertDialogHeader>
-										<AlertDialogFooter>
-											<AlertDialogCancel>Close</AlertDialogCancel>
-											<AlertDialogAction asChild>
-												<a
-													href={adminTelegramLink}
-													target='_blank'
-													rel='noopener noreferrer'
-													aria-disabled={!adminTelegramUsername}
-													className={
-														!adminTelegramUsername
-															? 'pointer-events-none opacity-60'
-															: ''
-													}
-												>
-													{adminTelegramUsername
-														? `Open @${adminTelegramUsername}`
-														: 'Admin Telegram username is not set'}
-												</a>
-											</AlertDialogAction>
-										</AlertDialogFooter>
-									</AlertDialogContent>
-								</AlertDialog>
 							</form>
 						) : (
 							<form onSubmit={handleRegister} className='space-y-5'>
@@ -324,9 +275,15 @@ export function LoginPage() {
 										required
 										className={INPUT_CLASS}
 									>
-										<option value='student' className='bg-blue-950 text-white'>Student</option>
-										<option value='teacher' className='bg-blue-950 text-white'>Teacher</option>
-										<option value='admin' className='bg-blue-950 text-white'>Admin</option>
+										<option value='student' className='bg-blue-950 text-white'>
+											Student
+										</option>
+										<option value='teacher' className='bg-blue-950 text-white'>
+											Teacher
+										</option>
+										<option value='admin' className='bg-blue-950 text-white'>
+											Admin
+										</option>
 									</select>
 								</div>
 

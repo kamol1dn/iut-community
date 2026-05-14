@@ -1,10 +1,26 @@
+import {
+	CheckCircle,
+	Clock,
+	MapPin,
+	Plus,
+	Search,
+	X,
+	XCircle,
+} from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { CheckCircle, Clock, MapPin, Plus, Search, X, XCircle } from 'lucide-react'
 import { authFetch } from '../lib/api'
 
-type RoomEntry = Record<string, unknown> & { _status: 'available' | 'occupied' }
+type RoomEntry = {
+	room_name: string
+	period: string | number
+	subject: string
+	professors: string[]
+	groups: string[]
+	_status: 'available' | 'occupied'
+}
 type Booking = Record<string, unknown>
 
+const TIMETABLE_API_BASE = 'http://46.101.98.64:8001'
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'] as const
 type Day = (typeof DAYS)[number]
 
@@ -41,26 +57,41 @@ export function RoomsPage() {
 		setLoading(true)
 		setError(null)
 		Promise.all([
-			authFetch(`/timetable/available_rooms?day=${selectedDay}`).then(r =>
+			authFetch(
+				`${TIMETABLE_API_BASE}/timetable/available_rooms?day=${selectedDay}`,
+			).then(r => (r.ok ? r.json() : { rooms: [] })),
+			authFetch(
+				`${TIMETABLE_API_BASE}/timetable/occupied_rooms?day=${selectedDay}`,
+			).then(r => (r.ok ? r.json() : { rooms: [] })),
+			authFetch(`${TIMETABLE_API_BASE}/bookings`).then(r =>
 				r.ok ? r.json() : [],
 			),
-			authFetch(`/timetable/occupied_rooms?day=${selectedDay}`).then(r =>
-				r.ok ? r.json() : [],
-			),
-			authFetch('/bookings').then(r => (r.ok ? r.json() : [])),
 		])
 			.then(([avail, occ, bkgs]) => {
-				const availArr: Record<string, unknown>[] = Array.isArray(avail)
-					? avail
-					: []
-				const occArr: Record<string, unknown>[] = Array.isArray(occ) ? occ : []
-				const availNames = new Set(availArr.map(r => str(r.room_name)))
-				setRooms([
-					...availArr.map(r => ({ ...r, _status: 'available' as const })),
-					...occArr
-						.filter(r => !availNames.has(str(r.room_name)))
-						.map(r => ({ ...r, _status: 'occupied' as const })),
-				])
+				// Handle available rooms (could be array or object with rooms property)
+				const availArr = Array.isArray(avail) ? avail : avail?.rooms || []
+
+				// Handle occupied rooms (comes as object with rooms array)
+				const occArr = Array.isArray(occ) ? occ : occ?.rooms || []
+
+				// Merge rooms with status
+				const mergedRooms: RoomEntry[] = [
+					...availArr.map((r: any) => ({
+						...r,
+						_status: 'available' as const,
+						period: r.period || '—',
+						professors: r.professors || [],
+						groups: r.groups || [],
+					})),
+					...occArr.map((r: any) => ({
+						...r,
+						_status: 'occupied' as const,
+						professors: r.professors || [],
+						groups: r.groups || [],
+					})),
+				]
+
+				setRooms(mergedRooms)
 				setBookings(Array.isArray(bkgs) ? bkgs : [])
 			})
 			.catch(e => setError(e.message))
@@ -75,7 +106,7 @@ export function RoomsPage() {
 		setBookingError(null)
 		setBookingLoading(true)
 		try {
-			const res = await authFetch('/bookings', {
+			const res = await authFetch(`${TIMETABLE_API_BASE}/bookings`, {
 				method: 'POST',
 				body: JSON.stringify({
 					room_name: bookRoom,
@@ -99,7 +130,9 @@ export function RoomsPage() {
 	}
 
 	const handleCancel = async (bookingId: string) => {
-		await authFetch(`/bookings/${bookingId}`, { method: 'DELETE' })
+		await authFetch(`${TIMETABLE_API_BASE}/bookings/${bookingId}`, {
+			method: 'DELETE',
+		})
 		fetchData(day)
 	}
 
@@ -207,13 +240,25 @@ export function RoomsPage() {
 											<XCircle className='w-4 h-4' />
 											<span>
 												Occupied
-												{room.subject != null ? `: ${str(room.subject)}` : ''}
+												{room.subject ? `: ${room.subject}` : ''}
 											</span>
 										</div>
 										{room.period != null && (
 											<div className='flex items-center gap-2 text-gray-600 bg-gray-50 px-3 py-2 rounded-lg'>
 												<Clock className='w-4 h-4' />
 												<span>Period {str(room.period)}</span>
+											</div>
+										)}
+										{room.professors && room.professors.length > 0 && (
+											<div className='text-sm text-gray-600'>
+												<span className='font-semibold'>Professor(s):</span>{' '}
+												{room.professors.join(', ')}
+											</div>
+										)}
+										{room.groups && room.groups.length > 0 && (
+											<div className='text-sm text-gray-600'>
+												<span className='font-semibold'>Group(s):</span>{' '}
+												{room.groups.join(', ')}
 											</div>
 										)}
 									</>
